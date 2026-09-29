@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arc USDC QA Fixtures</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #090d14; color: #e6edf3; }
+    nav { position: sticky; top: 0; z-index: 2; display: flex; gap: 9px; overflow-x: auto; padding: 12px 18px; background: #0d1117ee; border-bottom: 1px solid #30363d; }
+    nav a { color: #b7c4d4; text-decoration: none; white-space: nowrap; padding: 7px 10px; border-radius: 7px; background: #161b22; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px 16px 70px; }
+    h1 { margin-bottom: 6px; font-size: 27px; }
+    h2 { margin-top: 30px; }
+    p { color: #b7c4d4; line-height: 1.55; }
+    .card, details { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    summary { cursor: pointer; font-weight: 750; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 14px; }
+    .case { border: 1px solid #30363d; background: #0d1117; border-radius: 10px; padding: 13px; }
+    .case h3 { margin: 0 0 6px; font-size: 16px; }
+    .case p { min-height: 42px; margin: 4px 0 10px; font-size: 13px; }
+    .tag { display: inline-block; font-size: 11px; padding: 3px 7px; border-radius: 20px; margin-bottom: 8px; background: #30363d; }
+    .tag.tx { color: #ffb86b; }
+    .tag.sign { color: #79c0ff; }
+    button { border: 0; border-radius: 8px; padding: 10px 13px; margin: 4px 6px 4px 0; font-weight: 700; cursor: pointer; background: #30363d; color: white; }
+    button.primary { background: #238636; }
+    button.danger { background: #da3633; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    code, pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+    pre { max-height: 360px; overflow: auto; background: #090d14; padding: 12px; border-radius: 8px; font-size: 11px; }
+    .label { color: #8b949e; font-size: 12px; }
+    .ok { color: #3fb950; } .warn { color: #d29922; } .error { color: #f85149; }
+    input { width: 100%; padding: 10px; margin: 5px 0 10px; border-radius: 7px; border: 1px solid #30363d; background: #090d14; color: #e6edf3; }
+  </style>
+</head>
+<body>
+<nav aria-label="功能分组">
+  <a href="#setup">连接</a><a href="#transfer">Transfer</a><a href="#approve">Approve</a><a href="#allowance">Allowance</a><a href="#permit">Permit</a><a href="#permit2">Permit2</a><a href="#result">执行结果</a>
+</nav>
+<main>
+  <p>imToken QA fixture</p>
+  <h1>Arc USDC decimals 测试 DApp</h1>
+  <p>针对 Arc Native 18 位 / ERC-20 6 位兼容测试。所有链上用例发送前仍须在钱包确认；Permit 类用例只触发签名 Preview，不广播。</p>
+
+  <section id="setup" class="card">
+    <h2>连接与固定参数</h2>
+    <button id="connect">1. 连接钱包</button>
+    <button id="switch" disabled>2. 切换 Arc Mainnet</button>
+    <button id="refresh" disabled>刷新状态</button>
+    <p id="status" class="warn">请使用专用测试钱包。</p>
+    <div class="grid">
+      <div><span class="label">账户</span><br><code id="account">未连接</code></div>
+      <div><span class="label">chainId</span><br><code id="chain">未知</code></div>
+      <div><span class="label">USDC 合约</span><br><code id="token"></code></div>
+      <div><span class="label">Permit2 合约</span><br><code id="permit2Address"></code></div>
+    </div>
+    <label class="label" for="recipient">收款地址（默认自己）</label>
+    <input id="recipient" />
+    <label class="label" for="spender">Spender（默认自己，避免第三方授权风险）</label>
+    <input id="spender" />
+  </section>
+
+  <section id="transfer">
+    <h2>Transfer</h2>
+    <details open><summary>ERC-20 转账 · 2 cases</summary><div class="grid">
+      <article class="case"><span class="tag tx">链上交易</span><h3>Transfer 1 USDC</h3><p>调用 token.transfer(recipient, 1000000)，外层 value=0。</p><button data-case="transfer1" class="primary">执行</button></article>
+      <article class="case"><span class="tag tx">链上交易</span><h3>Transfer 0 USDC</h3><p>验证零值事件、详情和历史记录展示。</p><button data-case="transfer0">执行</button></article>
+    </div></details>
+  </section>
+
+  <section id="approve">
+    <h2>Approve</h2>
+    <details open><summary>授权金额 · 3 cases</summary><div class="grid">
+      <article class="case"><span class="tag tx">链上交易</span><h3>有限授权 1 USDC</h3><p>approve(spender, 1000000)，Preview 应显示 1 USDC。</p><button data-case="approve1" class="primary">执行</button></article>
+      <article class="case"><span class="tag tx">链上交易</span><h3>无限授权</h3><p>approve(spender, uint256.max)，应显示无限授权。</p><button data-case="approveMax" class="danger">执行</button></article>
+      <article class="case"><span class="tag tx">链上交易</span><h3>取消授权</h3><p>approve(spender, 0)，链上 allowance 应归零。</p><button data-case="approve0">执行</button></article>
+    </div></details>
+  </section>
+
+  <section id="allowance">
+    <h2>Increase / Decrease Allowance</h2>
+    <details open><summary>授权增减 · 3 cases</summary><div class="grid">
+      <article class="case"><span class="tag tx">链上交易</span><h3>Increase 1 USDC</h3><p>increaseAllowance(spender, 1000000)。需合约支持该方法。</p><button data-case="increase1">执行</button></article>
+      <article class="case"><span class="tag tx">链上交易</span><h3>Decrease 1 USDC</h3><p>decreaseAllowance(spender, 1000000)。先确保 allowance ≥ 1。</p><button data-case="decrease1">执行</button></article>
+      <article class="case"><span class="tag">只读</span><h3>查询 Allowance</h3><p>调用 allowance(owner, spender)，按 6 位显示。</p><button data-case="readAllowance">查询</button></article>
+    </div></details>
+  </section>
+
+  <section id="permit">
+    <h2>EIP-2612 Permit</h2>
+    <details open><summary>Typed Data 签名 · 3 cases</summary><div class="grid">
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit 1 USDC</h3><p>value=1000000；从链上读取 nonce，deadline=当前时间+1小时。</p><button data-case="permit1">签名</button></article>
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit 无限授权</h3><p>value=uint256.max，仅用于检查无限授权 Preview。</p><button data-case="permitMax" class="danger">签名</button></article>
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit 取消授权</h3><p>value=0，验证撤销展示；仅签名不会改变链上 allowance。</p><button data-case="permit0">签名</button></article>
+    </div></details>
+  </section>
+
+  <section id="permit2">
+    <h2>Permit2</h2>
+    <details open><summary>PermitSingle Typed Data · 3 cases</summary><div class="grid">
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit2 1 USDC</h3><p>PermitSingle amount=1000000，expiration 与 sigDeadline 为当前时间+1小时。</p><button data-case="permit2One">签名</button></article>
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit2 无限授权</h3><p>amount=uint160.max，检查 token、spender、金额及期限。</p><button data-case="permit2Max" class="danger">签名</button></article>
+      <article class="case"><span class="tag sign">仅签名</span><h3>Permit2 取消授权</h3><p>amount=0，仅签名 Preview，不会直接修改链上状态。</p><button data-case="permit2Zero">签名</button></article>
+    </div></details>
+    <p class="warn">注意：Permit2 签名前通常需先授权 USDC 给 Permit2 合约。本页的 Permit2 用例只检查 typed-data Preview，不提交最终执行交易。</p>
+  </section>
+
+  <section id="result" class="card">
+    <h2>执行结果 / QA 证据</h2>
+    <button id="copy">复制 JSON</button>
+    <pre id="output">尚未执行用例</pre>
+  </section>
+</main>
+<script>
+  const ARC_CHAIN_HEX = '0x13b2';
+  const ARC_CHAIN_ID = 5042;
+  const TOKEN = '0x3600000000000000000000000000000000000000';
+  const SELF = '0x4031e602F315e37ec17415740fd24605372911B6';
+  const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
+  const ONE = 1000000n;
+  const MAX256 = (1n << 256n) - 1n;
+  const MAX160 = (1n << 160n) - 1n;
+  let account = null;
+  let lastResult = null;
+  const $ = id => document.getElementById(id);
+  const word = value => value.toString().replace(/^0x/, '').toLowerCase().padStart(64, '0');
+  const addressWord = value => word(value);
+  const uintWord = value => word('0x' + BigInt(value).toString(16));
+  const callData = (selector, words) => selector + words.join('');
+  const selectors = { transfer:'0xa9059cbb', approve:'0x095ea7b3', increase:'0x39509351', decrease:'0xa457c2d7', allowance:'0xdd62ed3e', nonces:'0x7ecebe00', permit2Allowance:'0x927da105' };
+
+  $('token').textContent = TOKEN; $('permit2Address').textContent = PERMIT2;
+  $('recipient').value = SELF; $('spender').value = SELF;
+  document.querySelectorAll('[data-case]').forEach(button=>button.disabled=true);
+
+  function provider() { if (!window.ethereum) throw new Error('未检测到钱包，请在 imToken DApp 浏览器中打开'); return window.ethereum; }
+  function validAddress(value) { return /^0x[0-9a-fA-F]{40}$/.test(value); }
+  function selectedAddress(id) { const value=$(id).value.trim(); if(!validAddress(value)) throw new Error(id+' 地址格式无效'); return value; }
+  function setResult(kind, name, request, response) {
+    lastResult = { time:new Date().toISOString(), kind, case:name, chainId:ARC_CHAIN_ID, account, request, response };
+    $('output').textContent = JSON.stringify(lastResult, (_,v)=>typeof v==='bigint'?v.toString():v, 2);
+    location.hash = 'result';
+  }
+  async function refresh() {
+    const chain = await provider().request({method:'eth_chainId'});
+    const accounts = await provider().request({method:'eth_accounts'});
+    account = accounts[0] || null;
+    $('account').textContent = account || '未连接';
+    $('chain').textContent = chain + (chain===ARC_CHAIN_HEX?'（Arc Mainnet）':'（错误网络）');
+    $('chain').className = chain===ARC_CHAIN_HEX?'ok':'error';
+    $('switch').disabled = !account || chain===ARC_CHAIN_HEX;
+    $('refresh').disabled = !account;
+    document.querySelectorAll('[data-case]').forEach(b=>b.disabled=!account || chain!==ARC_CHAIN_HEX);
+    $('status').className = account && chain===ARC_CHAIN_HEX ? 'ok':'warn';
+    $('status').textContent = account && chain===ARC_CHAIN_HEX ? '已连接，可执行用例。每次仍需在钱包确认。':'请连接钱包并切换到 Arc Mainnet。';
+  }
+  async function sendTx(name, to, data) {
+    if(!account) throw new Error('请先连接钱包');
+    const request={from:account,to,value:'0x0',data};
+    setResult('transaction-request',name,request,'等待钱包确认');
+    const hash=await provider().request({method:'eth_sendTransaction',params:[request]});
+    setResult('transaction-submitted',name,request,{txHash:hash});
+  }
+  async function ethCallTo(to,data) { return provider().request({method:'eth_call',params:[{to,data},'latest']}); }
+  async function ethCall(data) { return ethCallTo(TOKEN,data); }
+  async function nonceOf(owner) { const raw=await ethCall(callData(selectors.nonces,[addressWord(owner)])); return BigInt(raw); }
+  async function permit2NonceOf(owner,spender) {
+    const data=callData(selectors.permit2Allowance,[addressWord(owner),addressWord(TOKEN),addressWord(spender)]);
+    const raw=await ethCallTo(PERMIT2,data);
+    if(raw.length<194) throw new Error('Permit2 allowance 返回格式异常，Arc 可能未部署该合约');
+    return BigInt('0x'+raw.slice(-64));
+  }
+  async function signTyped(name, typedData) {
+    setResult('typed-data-request',name,typedData,'等待钱包签名');
+    const signature=await provider().request({method:'eth_signTypedData_v4',params:[account,JSON.stringify(typedData)]});
+    setResult('typed-data-signed',name,typedData,{signature});
+  }
+  function eip2612(value, nonce) {
+    return {types:{EIP712Domain:[{name:'name',type:'string'},{name:'version',type:'string'},{name:'chainId',type:'uint256'},{name:'verifyingContract',type:'address'}],Permit:[{name:'owner',type:'address'},{name:'spender',type:'address'},{name:'value',type:'uint256'},{name:'nonce',type:'uint256'},{name:'deadline',type:'uint256'}]},primaryType:'Permit',domain:{name:'USDC',version:'1',chainId:ARC_CHAIN_ID,verifyingContract:TOKEN},message:{owner:account,spender:selectedAddress('spender'),value:value.toString(),nonce:nonce.toString(),deadline:(Math.floor(Date.now()/1000)+3600).toString()}};
+  }
+  function permit2Typed(amount,nonce) {
+    const expiry=Math.floor(Date.now()/1000)+3600;
+    return {types:{EIP712Domain:[{name:'name',type:'string'},{name:'chainId',type:'uint256'},{name:'verifyingContract',type:'address'}],PermitDetails:[{name:'token',type:'address'},{name:'amount',type:'uint160'},{name:'expiration',type:'uint48'},{name:'nonce',type:'uint48'}],PermitSingle:[{name:'details',type:'PermitDetails'},{name:'spender',type:'address'},{name:'sigDeadline',type:'uint256'}]},primaryType:'PermitSingle',domain:{name:'Permit2',chainId:ARC_CHAIN_ID,verifyingContract:PERMIT2},message:{details:{token:TOKEN,amount:amount.toString(),expiration:expiry.toString(),nonce:nonce.toString()},spender:selectedAddress('spender'),sigDeadline:expiry.toString()}};
+  }
+  const cases = {
+    transfer1:()=>sendTx('Transfer 1 USDC',TOKEN,callData(selectors.transfer,[addressWord(selectedAddress('recipient')),uintWord(ONE)])),
+    transfer0:()=>sendTx('Transfer 0 USDC',TOKEN,callData(selectors.transfer,[addressWord(selectedAddress('recipient')),uintWord(0)])),
+    approve1:()=>sendTx('Approve 1 USDC',TOKEN,callData(selectors.approve,[addressWord(selectedAddress('spender')),uintWord(ONE)])),
+    approveMax:()=>sendTx('Approve unlimited',TOKEN,callData(selectors.approve,[addressWord(selectedAddress('spender')),uintWord(MAX256)])),
+    approve0:()=>sendTx('Revoke approval',TOKEN,callData(selectors.approve,[addressWord(selectedAddress('spender')),uintWord(0)])),
+    increase1:()=>sendTx('Increase allowance 1 USDC',TOKEN,callData(selectors.increase,[addressWord(selectedAddress('spender')),uintWord(ONE)])),
+    decrease1:()=>sendTx('Decrease allowance 1 USDC',TOKEN,callData(selectors.decrease,[addressWord(selectedAddress('spender')),uintWord(ONE)])),
+    readAllowance:async()=>{const data=callData(selectors.allowance,[addressWord(account),addressWord(selectedAddress('spender'))]);const raw=await ethCall(data);setResult('read-only','Read allowance',{to:TOKEN,data},{raw,amountRaw:BigInt(raw).toString(),usdc:(Number(BigInt(raw))/1e6).toString()});},
+    permit1:async()=>signTyped('EIP-2612 Permit 1 USDC',eip2612(ONE,await nonceOf(account))),
+    permitMax:async()=>signTyped('EIP-2612 Permit unlimited',eip2612(MAX256,await nonceOf(account))),
+    permit0:async()=>signTyped('EIP-2612 Permit revoke',eip2612(0n,await nonceOf(account))),
+    permit2One:async()=>{const spender=selectedAddress('spender');return signTyped('Permit2 PermitSingle 1 USDC',permit2Typed(ONE,await permit2NonceOf(account,spender)));},
+    permit2Max:async()=>{const spender=selectedAddress('spender');return signTyped('Permit2 PermitSingle unlimited',permit2Typed(MAX160,await permit2NonceOf(account,spender)));},
+    permit2Zero:async()=>{const spender=selectedAddress('spender');return signTyped('Permit2 PermitSingle revoke',permit2Typed(0n,await permit2NonceOf(account,spender)));}
+  };
+  $('connect').onclick=async()=>{try{await provider().request({method:'eth_requestAccounts'});await refresh();}catch(e){$('status').className='error';$('status').textContent=e.message||String(e);}};
+  $('switch').onclick=async()=>{try{await provider().request({method:'wallet_switchEthereumChain',params:[{chainId:ARC_CHAIN_HEX}]});await refresh();}catch(e){$('status').className='error';$('status').textContent='切换失败：'+(e.message||String(e));}};
+  $('refresh').onclick=refresh;
+  document.querySelectorAll('[data-case]').forEach(button=>button.onclick=async()=>{try{button.disabled=true;await cases[button.dataset.case]();}catch(e){setResult('error',button.dataset.case,null,{message:e.message||String(e),code:e.code??null});}finally{await refresh().catch(()=>{});}});
+  $('copy').onclick=async()=>{await navigator.clipboard.writeText($('output').textContent);$('copy').textContent='已复制';setTimeout(()=>$('copy').textContent='复制 JSON',1200);};
+  if(window.ethereum){window.ethereum.on?.('accountsChanged',refresh);window.ethereum.on?.('chainChanged',refresh);refresh().catch(()=>{});}
+</script>
+</body>
+</html>

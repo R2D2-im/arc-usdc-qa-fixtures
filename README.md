@@ -4,6 +4,9 @@ Static single-page test tool for `ops#323`. It groups executable fixtures for
 ERC-20 transfer, finite/unlimited/revoke approval, increase/decrease allowance,
 EIP-2612 Permit, and Permit2.
 
+It supports both an injected wallet inside the imToken DApp browser and a
+WalletConnect v2 QR session from a desktop browser.
+
 ## Run locally
 
 ```sh

@@ -32,6 +32,8 @@
     .label { color: #8b949e; font-size: 12px; }
     .ok { color: #3fb950; } .warn { color: #d29922; } .error { color: #f85149; }
     input { width: 100%; padding: 10px; margin: 5px 0 10px; border-radius: 7px; border: 1px solid #30363d; background: #090d14; color: #e6edf3; }
+    #wcQr { display: flex; justify-content: center; padding: 10px; }
+    #wcQr canvas { width: min(280px, 100%) !important; height: auto !important; background: white; border-radius: 8px; }
   </style>
 </head>
 <body>
@@ -45,9 +47,11 @@
 
   <section id="setup" class="card">
     <h2>连接与固定参数</h2>
-    <button id="connect">1. 连接钱包</button>
+    <button id="connect">连接内置钱包</button>
+    <button id="connectWc" class="primary">WalletConnect 扫码</button>
     <button id="switch" disabled>2. 切换 Arc Mainnet</button>
     <button id="refresh" disabled>刷新状态</button>
+    <div id="wcQr"></div>
     <p id="status" class="warn">请使用专用测试钱包。</p>
     <div class="grid">
       <div><span class="label">账户</span><br><code id="account">未连接</code></div>
@@ -112,6 +116,7 @@
     <pre id="output">尚未执行用例</pre>
   </section>
 </main>
+<script type="module" src="./walletconnect.js"></script>
 <script>
   const ARC_CHAIN_HEX = '0x13b2';
   const ARC_CHAIN_ID = 5042;
@@ -122,6 +127,7 @@
   const MAX256 = (1n << 256n) - 1n;
   const MAX160 = (1n << 160n) - 1n;
   let account = null;
+  let activeProvider = null;
   let lastResult = null;
   const $ = id => document.getElementById(id);
   const word = value => value.toString().replace(/^0x/, '').toLowerCase().padStart(64, '0');
@@ -134,7 +140,8 @@
   $('recipient').value = SELF; $('spender').value = SELF;
   document.querySelectorAll('[data-case]').forEach(button=>button.disabled=true);
 
-  function provider() { if (!window.ethereum) throw new Error('未检测到钱包，请在 imToken DApp 浏览器中打开'); return window.ethereum; }
+  function provider() { if (activeProvider) return activeProvider; if (!window.ethereum) throw new Error('请选择内置钱包或 WalletConnect 扫码连接'); return window.ethereum; }
+  window.setExternalProvider = async value => { activeProvider=value; await refresh(); };
   function validAddress(value) { return /^0x[0-9a-fA-F]{40}$/.test(value); }
   function selectedAddress(id) { const value=$(id).value.trim(); if(!validAddress(value)) throw new Error(id+' 地址格式无效'); return value; }
   function setResult(kind, name, request, response) {
@@ -199,12 +206,13 @@
     permit2Max:async()=>{const spender=selectedAddress('spender');return signTyped('Permit2 PermitSingle unlimited',permit2Typed(MAX160,await permit2NonceOf(account,spender)));},
     permit2Zero:async()=>{const spender=selectedAddress('spender');return signTyped('Permit2 PermitSingle revoke',permit2Typed(0n,await permit2NonceOf(account,spender)));}
   };
-  $('connect').onclick=async()=>{try{await provider().request({method:'eth_requestAccounts'});await refresh();}catch(e){$('status').className='error';$('status').textContent=e.message||String(e);}};
+  $('connect').onclick=async()=>{try{if(!window.ethereum)throw new Error('未检测到内置钱包');activeProvider=window.ethereum;await provider().request({method:'eth_requestAccounts'});await refresh();}catch(e){$('status').className='error';$('status').textContent=e.message||String(e);}};
+  $('connectWc').onclick=async()=>{try{if(!window.connectWalletConnect)throw new Error('WalletConnect 模块仍在加载，请稍后重试');$('status').className='warn';$('status').textContent='正在生成 WalletConnect 二维码…';await window.connectWalletConnect();}catch(e){$('status').className='error';$('status').textContent=e.message||String(e);}};
   $('switch').onclick=async()=>{try{await provider().request({method:'wallet_switchEthereumChain',params:[{chainId:ARC_CHAIN_HEX}]});await refresh();}catch(e){$('status').className='error';$('status').textContent='切换失败：'+(e.message||String(e));}};
   $('refresh').onclick=refresh;
   document.querySelectorAll('[data-case]').forEach(button=>button.onclick=async()=>{try{button.disabled=true;await cases[button.dataset.case]();}catch(e){setResult('error',button.dataset.case,null,{message:e.message||String(e),code:e.code??null});}finally{await refresh().catch(()=>{});}});
   $('copy').onclick=async()=>{await navigator.clipboard.writeText($('output').textContent);$('copy').textContent='已复制';setTimeout(()=>$('copy').textContent='复制 JSON',1200);};
-  if(window.ethereum){window.ethereum.on?.('accountsChanged',refresh);window.ethereum.on?.('chainChanged',refresh);refresh().catch(()=>{});}
+  if(window.ethereum){window.ethereum.on?.('accountsChanged',refresh);window.ethereum.on?.('chainChanged',refresh);}
 </script>
 </body>
 </html>
